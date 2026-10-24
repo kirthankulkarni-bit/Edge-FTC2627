@@ -57,7 +57,7 @@ All code must use these exact names.
 Do these in order. Ask before moving to the next one if anything is unclear.
 
 1. ~~**Verify the Quickstart project** builds and syncs.~~ Done: builds on FTC SDK 12.0.0, Pedro 3.0.2.
-2. **Fill in the Pedro constants file** (`TeamCode/src/main/java/org/firstinspires/ftc/teamcode/pedro/Constants.java`) with our motor names, directions, and robot mass. Ask us for the mass in kg. Do not guess.
+2. **Fill in the Pedro constants file** (`TeamCode/src/main/java/org/firstinspires/ftc/teamcode/pedro/Constants.java`). Motor names and directions are done. Every `TODO` is a placeholder to replace with tuner output once the robot is available (Pinpoint name, pod type, offsets and directions; all Foresight values). Pedro 3.0.2 has no robot-mass setting.
 3. ~~**Port our two OpModes**~~ Done: `BasicAuto.java` and `StraferTeleOp.java` are in `TeamCode/src/main/java/org/firstinspires/ftc/teamcode/`.
 4. **Write a Pedro version of the autonomous** with the same routine:
    - Drive forward 12 inches

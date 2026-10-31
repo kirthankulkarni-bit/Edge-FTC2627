@@ -4,6 +4,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /**
@@ -28,6 +29,18 @@ public class Launcher {
     public static double FEED_POWER = 1.0;
     public static double SHOT_INTERVAL = 0.35;   // seconds between pieces (lets the flywheel recover)
     public static double SIM_SPINUP_SECONDS = 1.0;
+
+    // Flywheel velocity PIDF (runs on the hub's motor controller, ~20x faster than our loop).
+    // Starting values use the FTC/REV recipe:
+    //   F = 32767 / max ticks per second   (max = 6000 RPM * 28 ticks / 60 = 2800 t/s -> F ~ 11.7)
+    //   P = 0.1 * F,   I = 0.1 * P,   D = 0
+    // F does most of the work (the power needed for the target speed); P and I pull it back up
+    // after a shot slows the wheel. Tune with the "Launcher Tuner" OpMode.
+    public static boolean USE_CUSTOM_PIDF = true;  // false = SDK default gains
+    public static double FLY_P = 1.17;  // TODO: tune - higher = faster recovery, too high = oscillates
+    public static double FLY_I = 0.117; // TODO: tune - removes a steady speed shortfall
+    public static double FLY_D = 0.0;   // usually not needed for a flywheel
+    public static double FLY_F = 11.7;  // TODO: recompute from the real flywheel's measured max speed
     // ==================================================
 
     private final DcMotorEx flywheel;  // null when simulated
@@ -45,7 +58,15 @@ public class Launcher {
             // RUN_USING_ENCODER lets setVelocity() hold a steady speed even as the battery drops.
             flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
             flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);  // coast, don't slam to a stop
+            applyPIDF();
         }
+    }
+
+    /** Sends FLY_P/I/D/F to the motor. Call again after changing them (the tuner does). */
+    public void applyPIDF() {
+        if (flywheel == null || !USE_CUSTOM_PIDF) return;
+        flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
+                new PIDFCoefficients(FLY_P, FLY_I, FLY_D, FLY_F));
     }
 
     public void spinUp() {

@@ -21,10 +21,11 @@ import org.firstinspires.ftc.teamcode.pedro.Constants;
  *   3. Go up the side corridor, then around the HIVE to the far side (our other CELL is raised
  *      after the tip), align, launch.
  *   4. Park in our LOADING ZONE (5 pts).
+ * THREE_TIPS adds a third cycle from the Scoring-Side FLOWER instead of parking (see Route).
  *
  * BEFORE THE MATCH (during INIT, on gamepad 1):
  *   dpad up / down    = start delay +/- 0.5 s (to stay out of an alliance partner's way)
- *   dpad left / right = choose the route (see Route below)
+ *   dpad left / right = choose the route
  *
  * Coordinates: Pedro visualizer BIOBUZZ field. Inches, (0,0) = audience-wall corner on the red
  * side, x toward blue, y toward the far wall. Blue = red route rotated 180 degrees.
@@ -42,13 +43,17 @@ public abstract class BiobuzzAuto extends OpMode {
     static final double[] SHOOT_FAR  = {60, 126, 270}; // facing the far-side CELL
     static final double[] SIDE_LANE  = {18, 50, 180};  // waypoint that keeps park-only routes off the HIVE
     static final double[] PARK       = {12, 108, 180}; // overlaps LOADING ZONE (x 0-11, y 96-120)
+    // THREE_TIPS only: Scoring-Side FLOWER on the far wall (x 43.4-50.1, y 137.7-141.5)
+    static final double[] FLOWER_2   = {47, 128, 90};
+    static final double[] BACK_TOP   = {24, 100, 90};  // return trip down the side corridor...
+    static final double[] BACK_LOW   = {20, 50, 90};   // ...and back out below the HIVE
 
     // Timing
-    static final double SHOOT_SECONDS   = 2.5;  // TODO: spin-up + 4 launches, from the real launcher
+    static final double SHOOT_TIMEOUT   = 3.0;  // give up on launching after this
     static final double INTAKE_TIMEOUT  = 2.5;  // leave the FLOWER even if we have fewer than 4
     static final double ALIGN_TIMEOUT   = 0.8;  // never spend longer than this aligning
     static final double STEP_TIMEOUT_S  = 5.0;  // safety: give up on any drive after this
-    static final double PARK_BY_SECONDS = 25.0; // skip to parking after this (AUTO is 30 s)
+    static final double PARK_BY_SECONDS = 25.0; // skip to parking after this (not in THREE_TIPS)
     static final double MAX_START_DELAY = 10.0;
 
     // AprilTag alignment
@@ -60,23 +65,30 @@ public abstract class BiobuzzAuto extends OpMode {
 
     /** Alliance-partner deconfliction: pick in INIT with dpad left/right. */
     enum Route {
-        FULL,          // preloads near, FLOWER, far CELL, park (best when the hive tips)
+        FULL,          // preloads near, FLOWER, far CELL, park                       up to 48 pts
+        THREE_TIPS,    // FULL, then Scoring-Side FLOWER and near CELL again, no park  up to 63 pts
         NEAR_TWICE,    // preloads near, FLOWER, back to the near CELL, park (hive didn't tip / partner uses far side)
         PRELOAD_PARK,  // preloads near, then park (partner needs our FLOWER lane)
         PARK_ONLY      // LEAVE + PARK only, 8 pts (launcher broken)
     }
 
+    /** Remembered for TeleOp so it aims at the right CELL tags. */
+    static boolean lastAllianceRed = true;
+
     /** true for the red OpMode, false for blue. */
     protected abstract boolean isRed();
 
     private enum State {
-        START_DELAY, TO_SHOOT_1, ALIGN_1, SHOOT_1,
+        START_DELAY,
+        TO_SHOOT_1, ALIGN_1, SHOOT_1,
         TO_FLOWER, INTAKE, TO_SHOOT_2, ALIGN_2, SHOOT_2,
+        TO_FLOWER_2, INTAKE_2, TO_SHOOT_3, ALIGN_3, SHOOT_3,
         TO_PARK, DONE
     }
 
     private Follower follower;
     private Intake intake;
+    private Launcher launcher;
     private TagAligner aligner;
 
     private Route route = Route.FULL;
@@ -84,11 +96,12 @@ public abstract class BiobuzzAuto extends OpMode {
     private boolean lastUp, lastDown, lastLeft, lastRight;
 
     private Pose start, shootNear, flower, shootFar, park;
-    private Path toShoot1, toFlower, toShoot2, toPark, parkFromStart;
-    private Pose shot2;        // where the second batch is launched from
-    private int[] cell1, cell2; // tag ID ranges {min, max} for each shot
+    private Path toShoot1, toFlower, toShoot2, toPark, parkFromStart, toFlower2, toShoot3;
+    private Pose shot2;           // where the second batch is launched from
+    private int[] cell1, cell2;   // tag ID ranges {min, max}; the third shot reuses cell1
 
     private State state = State.START_DELAY;
+    private State afterShot;      // where SHOOT_x goes next
     private Pose alignTarget;
     private int stableLoops;
     private final ElapsedTime stepTimer = new ElapsedTime();
@@ -100,8 +113,10 @@ public abstract class BiobuzzAuto extends OpMode {
     public void init() {
         follower = Constants.create(hardwareMap);
         intake = new Intake(hardwareMap);
+        launcher = new Launcher(hardwareMap);
         aligner = new TagAligner(hardwareMap);
         intake.setCount(4);  // G304: exactly 4 preloads
+        lastAllianceRed = isRed();
     }
 
     /** Runs repeatedly between INIT and START: lets the drive team set the delay and route. */
@@ -123,6 +138,7 @@ public abstract class BiobuzzAuto extends OpMode {
         telemetry.addData("Start delay (dpad U/D)", "%.1f s", startDelay);
         telemetry.addData("Limelight", aligner.available() ? "found" : "NOT configured - no aligning");
         telemetry.addData("Intake count", intake.countSource());
+        telemetry.addData("Launcher", launcher.isSimulated() ? "SIMULATED (no 'launcher' motor)" : "real");
     }
 
     @Override
@@ -156,12 +172,12 @@ public abstract class BiobuzzAuto extends OpMode {
         // Straight line, turning while it drives: the turn is spread over ~47 in of travel.
         toFlower = line(shootNear, flower).linear(shootNear.heading(), flower.heading());
 
-        if (route == Route.FULL) {
+        boolean farSecond = route == Route.FULL || route == Route.THREE_TIPS;
+        if (farSecond) {
             shot2 = shootFar;
             cell2 = isRed() ? redFar : blueNear;
-            // DRIFT FIX. The old version was one long arc FLOWER -> (24,112) -> SHOOT_FAR that also
-            // turned 90 degrees along the way. Turning and arcing at speed is when mecanum wheels slip
-            // on foam and the robot swings wide (toward the HIVE). Now it is two pieces:
+            // DRIFT FIX. One long arc that also turned 90 degrees made the wheels slip and the robot
+            // swing wide toward the HIVE. Now it is two pieces:
             //   a) a STRAIGHT run up the open side corridor (x 16-24, far from the HIVE at x>=46).
             //      The 90-degree turn happens here, where a little slip can't cause a collision.
             //   b) a SHORT, GENTLE arc around the far end of the HIVE with the heading held CONSTANT,
@@ -179,17 +195,29 @@ public abstract class BiobuzzAuto extends OpMode {
             toShoot2 = line(flower, shootNear).linear(flower.heading(), shootNear.heading());
         }
 
+        // THREE_TIPS: after the 2nd tip the near CELL is raised again. Grab the Scoring-Side FLOWER
+        // (13 in away) and go back down the side corridor. The heading stays CONSTANT the whole
+        // way back: mecanum can drive sideways/backwards, and not turning means no slip.
+        Pose flower2 = pose(FLOWER_2);
+        toFlower2 = line(shootFar, flower2).linear(shootFar.heading(), flower2.heading());
+        toShoot3 = path(
+                line(flower2, pose(BACK_TOP)).constant(flower2.heading()),
+                line(pose(BACK_TOP), pose(BACK_LOW)).constant(flower2.heading()),
+                line(pose(BACK_LOW), shootNear).constant(shootNear.heading()));
+
         // Park routes. From the far shot the run to the LOADING ZONE is clear of the HIVE.
         // From the near side, a straight line would clip the HIVE's corner, so go via SIDE_LANE.
-        if (route == Route.FULL) {
+        if (farSecond) {
             toPark = line(shot2, park).linear(shot2.heading(), park.heading());
         } else {
-            toPark = path(
-                    line(shot2, sideLane).linear(shot2.heading(), sideLane.heading()),
-                    line(sideLane, park).constant(park.heading()));
+            toPark = parkVia(shot2, sideLane);
         }
-        parkFromStart = path(
-                line(start, sideLane).linear(start.heading(), sideLane.heading()),
+        parkFromStart = parkVia(start, sideLane);
+    }
+
+    private Path parkVia(Pose from, Pose sideLane) {
+        return path(
+                line(from, sideLane).linear(from.heading(), sideLane.heading()),
                 line(sideLane, park).constant(park.heading()));
     }
 
@@ -201,13 +229,17 @@ public abstract class BiobuzzAuto extends OpMode {
         // we pause by switching the follower to hold() a pose instead.
         follower.update();
         intake.update();
+        launcher.update();
 
         boolean driveDone = !follower.isBusy();
         boolean timedOut = stepTimer.seconds() > STEP_TIMEOUT_S;
 
         // Parking is worth 5 pts: never let a slow step cost us the park.
-        if (autoTimer.seconds() > PARK_BY_SECONDS && state != State.TO_PARK && state != State.DONE) {
+        // THREE_TIPS deliberately trades the park for a third tip (20 > 5), so it skips this.
+        if (route != Route.THREE_TIPS && autoTimer.seconds() > PARK_BY_SECONDS
+                && state != State.TO_PARK && state != State.DONE) {
             intake.stop();
+            launcher.stop();
             Pose here = follower.pose();
             follower.follow(line(here, park).linear(here.heading(), park.heading()));
             next(State.TO_PARK);
@@ -222,22 +254,24 @@ public abstract class BiobuzzAuto extends OpMode {
                         next(State.TO_PARK);
                     } else {
                         follower.follow(toShoot1);
-                        // TODO: start spinning up the launcher here so it's ready on arrival
+                        launcher.spinUp();  // spin up while driving so it's ready on arrival
                         next(State.TO_SHOOT_1);
                     }
                 }
                 break;
 
+            // ----- shot 1: preloads into the near CELL
             case TO_SHOOT_1:
                 if (driveDone || timedOut) beginAlign(shootNear, State.ALIGN_1);
                 break;
             case ALIGN_1:
-                if (aligned(cell1)) next(State.SHOOT_1);  // TODO: start feeding the launcher here
+                if (aligned(cell1)) shoot(State.SHOOT_1,
+                        route == Route.PRELOAD_PARK ? State.TO_PARK : State.TO_FLOWER);
                 break;
             case SHOOT_1:
-                if (stepTimer.seconds() > SHOOT_SECONDS) {
-                    intake.setCount(0);  // TODO: count down per launch if the launcher has a sensor
-                    if (route == Route.PRELOAD_PARK) {
+                if (shotFinished()) {
+                    if (afterShot == State.TO_PARK) {
+                        launcher.stop();
                         follower.follow(toPark);
                         next(State.TO_PARK);
                     } else {
@@ -248,10 +282,11 @@ public abstract class BiobuzzAuto extends OpMode {
                 }
                 break;
 
+            // ----- collect 4 at the Alliance FLOWER, shot 2
             case TO_FLOWER:
                 // The sensor may already count pieces on arrival; leave as soon as we have 4.
                 if (intake.isFull()) {
-                    leaveFlower();
+                    leaveFlower(toShoot2, State.TO_SHOOT_2);
                 } else if (driveDone || timedOut) {
                     next(State.INTAKE);
                 }
@@ -259,27 +294,57 @@ public abstract class BiobuzzAuto extends OpMode {
             case INTAKE:
                 // Leave the moment the 4th piece is counted (the Intake class stops itself),
                 // or after INTAKE_TIMEOUT with whatever we have - a partial batch still scores.
-                if (intake.isFull() || stepTimer.seconds() > INTAKE_TIMEOUT) leaveFlower();
+                if (intake.isFull() || stepTimer.seconds() > INTAKE_TIMEOUT) leaveFlower(toShoot2, State.TO_SHOOT_2);
                 break;
-
             case TO_SHOOT_2:
                 if (driveDone || timedOut) beginAlign(shot2, State.ALIGN_2);
                 break;
             case ALIGN_2:
-                if (aligned(cell2)) next(State.SHOOT_2);  // TODO: start feeding the launcher here
+                if (aligned(cell2)) shoot(State.SHOOT_2,
+                        route == Route.THREE_TIPS ? State.TO_FLOWER_2 : State.TO_PARK);
                 break;
             case SHOOT_2:
-                if (stepTimer.seconds() > SHOOT_SECONDS) {
-                    intake.setCount(0);
-                    follower.follow(toPark);
-                    next(State.TO_PARK);
+                if (shotFinished()) {
+                    if (afterShot == State.TO_FLOWER_2) {
+                        follower.follow(toFlower2);
+                        intake.start();
+                        next(State.TO_FLOWER_2);
+                    } else {
+                        launcher.stop();
+                        follower.follow(toPark);
+                        next(State.TO_PARK);
+                    }
+                }
+                break;
+
+            // ----- THREE_TIPS: collect at the Scoring-Side FLOWER, shot 3 back at the near CELL
+            case TO_FLOWER_2:
+                if (intake.isFull()) {
+                    leaveFlower(toShoot3, State.TO_SHOOT_3);
+                } else if (driveDone || timedOut) {
+                    next(State.INTAKE_2);
+                }
+                break;
+            case INTAKE_2:
+                if (intake.isFull() || stepTimer.seconds() > INTAKE_TIMEOUT) leaveFlower(toShoot3, State.TO_SHOOT_3);
+                break;
+            case TO_SHOOT_3:
+                if (driveDone || timedOut) beginAlign(shootNear, State.ALIGN_3);
+                break;
+            case ALIGN_3:
+                if (aligned(cell1)) shoot(State.SHOOT_3, State.DONE);
+                break;
+            case SHOOT_3:
+                if (shotFinished()) {
+                    launcher.stop();
+                    follower.stop();
+                    next(State.DONE);  // no time left to park: AUTO ends around here
                 }
                 break;
 
             case TO_PARK:
                 if (driveDone || timedOut) {
                     follower.stop();
-                    aligner.stop();
                     next(State.DONE);
                 }
                 break;
@@ -293,15 +358,39 @@ public abstract class BiobuzzAuto extends OpMode {
         telemetry.addData("Auto time", "%.1f s", autoTimer.seconds());
         telemetry.addData("x / y / heading deg", "%.1f / %.1f / %.0f", p.x(), p.y(), Math.toDegrees(p.heading()));
         telemetry.addData("POLLEN held", "%d (%s)", intake.count(), intake.countSource());
+        telemetry.addData("Launcher RPM", "%.0f%s", launcher.rpm(), launcher.isSimulated() ? " (sim)" : "");
+    }
+
+    @Override
+    public void stop() {
+        aligner.stop();
     }
 
     // ---------------------------------------------------------------- HELPERS
 
-    private void leaveFlower() {
+    private void leaveFlower(Path toShoot, State nextState) {
         intake.stop();
-        follower.follow(toShoot2);
-        // TODO: spin up the launcher here
-        next(State.TO_SHOOT_2);
+        launcher.spinUp();  // spin up on the way to the shooting spot
+        follower.follow(toShoot);
+        next(nextState);
+    }
+
+    /** Start launching everything we hold, then go to `then` when done. */
+    private void shoot(State shootState, State then) {
+        launcher.fire(intake.count());
+        afterShot = then;
+        next(shootState);
+    }
+
+    /** True when all pieces are launched (or the launch timed out). Resets the held count. */
+    private boolean shotFinished() {
+        if (launcher.isDone() || stepTimer.seconds() > SHOOT_TIMEOUT) {
+            intake.setCount(launcher.shotsLeft());  // anything not launched is still in the robot
+            launcher.stop();
+            launcher.spinUp();  // keep the flywheel spinning between shots that come soon
+            return true;
+        }
+        return false;
     }
 
     /** The path ended: stop following it and HOLD the shooting pose while vision fine-tunes the aim. */

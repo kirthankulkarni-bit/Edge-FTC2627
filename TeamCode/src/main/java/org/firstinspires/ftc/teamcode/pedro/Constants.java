@@ -70,10 +70,15 @@ public class Constants {
         c.linearBrakeCoefficients.set(Matrix.diag(0.0, 0.0));             // TODO: ForesightTuner
         c.quadraticBrakeCoefficients.set(Matrix.diag(0.0, 0.0));          // TODO: ForesightTuner
 
-        c.maxAchievableForwardVelocity.set(30.0);  // TODO: ForesightTuner, inches per second
-        c.maxAchievableStrafeVelocity.set(25.0);   // TODO: ForesightTuner, inches per second
-        c.naturalForwardDeceleration.set(30.0);    // TODO: ForesightTuner
-        c.naturalStrafeDeceleration.set(30.0);     // TODO: ForesightTuner
+        // ESTIMATES from the spec sheet, until the tuner measures the real robot:
+        //   312 RPM / 60 = 5.2 rev/s;  5.2 rev/s * (3.78 in * pi) = ~61.7 in/s free speed.
+        //   Real robots reach ~75% of free speed forward, and mecanum strafes ~80% of that.
+        c.maxAchievableForwardVelocity.set(46.0);  // TODO: ForesightTuner, inches per second
+        c.maxAchievableStrafeVelocity.set(37.0);   // TODO: ForesightTuner, inches per second
+        // How fast the robot slows down on its own when power is cut (in/s per second).
+        // Guessed low on purpose, so Pedro starts braking early rather than late.
+        c.naturalForwardDeceleration.set(40.0);    // TODO: ForesightTuner
+        c.naturalStrafeDeceleration.set(40.0);     // TODO: ForesightTuner
     });
 
     /** Builds a ready-to-use Follower. Call once in init(). */

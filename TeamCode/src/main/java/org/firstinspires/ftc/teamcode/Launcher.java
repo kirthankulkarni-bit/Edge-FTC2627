@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
@@ -20,6 +21,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  *
  * If "launcher" isn't configured, everything is SIMULATED with the same timing, so autos run now.
  */
+@Configurable  // public static values below can be live-edited in Panels
 public class Launcher {
 
     // ================= TUNING SECTION =================
@@ -68,6 +70,15 @@ public class Launcher {
         if (flywheel == null || !USE_CUSTOM_PIDF) return;
         flywheel.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,
                 new PIDFCoefficients(FLY_P, FLY_I, FLY_D, FLY_F));
+        appliedPIDF = new double[]{FLY_P, FLY_I, FLY_D, FLY_F};
+    }
+
+    private double[] appliedPIDF = null;
+
+    /** True if someone changed the gains (e.g. live in Panels) since they were last sent to the motor. */
+    private boolean gainsChanged() {
+        return appliedPIDF == null || appliedPIDF[0] != FLY_P || appliedPIDF[1] != FLY_I
+                || appliedPIDF[2] != FLY_D || appliedPIDF[3] != FLY_F;
     }
 
     /** Change the speed for the next shots, e.g. from ShotTable. TARGET_RPM is the default. */
@@ -96,6 +107,7 @@ public class Launcher {
     /** Call every loop. */
     public void update() {
         if (flywheel != null) {
+            if (USE_CUSTOM_PIDF && gainsChanged()) applyPIDF();  // picks up live edits from Panels
             flywheel.setVelocity(spinning ? targetRpm / 60.0 * TICKS_PER_REV : 0);
         }
         boolean feeding = shotsLeft > 0 && isReady();

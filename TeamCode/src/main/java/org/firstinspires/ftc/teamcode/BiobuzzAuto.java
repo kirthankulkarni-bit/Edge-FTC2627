@@ -112,6 +112,8 @@ public abstract class BiobuzzAuto extends OpMode {
     @Override
     public void init() {
         RobotUtil.enableBulkCaching(hardwareMap);  // faster loops = tighter path following
+        PanelsView.init();
+        telemetry = PanelsView.joined(telemetry);  // telemetry also shows in Panels
         follower = Constants.create(hardwareMap);
         intake = new Intake(hardwareMap);
         launcher = new Launcher(hardwareMap);
@@ -360,6 +362,10 @@ public abstract class BiobuzzAuto extends OpMode {
         telemetry.addData("x / y / heading deg", "%.1f / %.1f / %.0f", p.x(), p.y(), Math.toDegrees(p.heading()));
         telemetry.addData("POLLEN held", "%d (%s)", intake.count(), intake.countSource());
         telemetry.addData("Launcher RPM", "%.0f%s", launcher.rpm(), launcher.isSimulated() ? " (sim)" : "");
+
+        // Live field view in Panels: robot, trail, current path, and the aim pose while aligning.
+        boolean aligning = state == State.ALIGN_1 || state == State.ALIGN_2 || state == State.ALIGN_3;
+        PanelsView.draw(p, follower.currentPath(), aligning ? alignTarget : null);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
@@ -14,6 +15,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
  *
  * If no device named "limelight" is configured, available() is false and the auto skips aligning.
  */
+@Configurable  // public static values below can be live-edited in Panels
 public class TagAligner {
 
     // ================= TUNING SECTION =================

@@ -1,6 +1,7 @@
 repositories {
     mavenCentral()
     maven { url 'https://repo.dairy.foundation/releases/'}
+    maven { url 'https://mymaven.bylazar.com/releases' } // Panels dashboard
     google() // Needed for androidx
 }
 
@@ -16,5 +17,6 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.2.0'
 
     implementation 'com.pedropathing:revhub:3.0.2'
-    implementation 'com.pedropathing:tuning:1.0.1'
+    implementation 'com.pedropathing:tuning:1.0.3'
+    implementation 'com.bylazar:fullpanels:1.0.19' // Panels dashboard (http://192.168.43.1:8001)
 }

@@ -61,6 +61,7 @@ public class BiobuzzTeleOp extends LinearOpMode {
     @Override
     public void runOpMode() {
         RobotUtil.enableBulkCaching(hardwareMap);
+        telemetry = PanelsView.joined(telemetry);  // telemetry also shows in Panels
 
         leftFront  = hardwareMap.get(DcMotor.class, "leftFront");
         leftBack   = hardwareMap.get(DcMotor.class, "leftBack");

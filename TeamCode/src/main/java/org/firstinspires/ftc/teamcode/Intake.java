@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -20,6 +21,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * Other sensors work the same way: a distance sensor ("piece present when < X cm") or a color
  * sensor in each slot. Swap the detection lines in update() for whatever the build team mounts.
  */
+@Configurable  // public static values below can be live-edited in Panels
 public class Intake {
 
     // ================= TUNING SECTION =================

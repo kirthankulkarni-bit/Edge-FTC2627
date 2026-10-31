@@ -42,8 +42,9 @@ missing from the robot configuration, so everything runs before the robot is bui
 | `LauncherTuner` | Tunes flywheel PIDF and measures shot recovery |
 | `LimelightTest` | Shows what the Limelight sees |
 | `pedro/Constants`, `pedro/Tuning` | Pedro config (TODOs) and tuner registration (web page http://192.168.43.1:10158) |
-| `PIDF`, `Lift` | Generic PIDF controller + lift template (not used by BIOBUZZ yet) |
-| `BasicAuto`, `PedroAuto`, `SampleScoringAuto`, `StraferTeleOp` | Earlier practice OpModes |
+| `PIDF` | Generic PIDF controller for future position mechanisms (arm, hood, turret) |
+| `PanelsView` | Panels dashboard: field drawing + telemetry (http://192.168.43.1:8001) |
+| `PedroAuto`, `StraferTeleOp` | Simple Pedro test auto, and a drive-only backup TeleOp |
 
 ## Hardware
 

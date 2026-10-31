@@ -111,6 +111,7 @@ public abstract class BiobuzzAuto extends OpMode {
 
     @Override
     public void init() {
+        RobotUtil.enableBulkCaching(hardwareMap);  // faster loops = tighter path following
         follower = Constants.create(hardwareMap);
         intake = new Intake(hardwareMap);
         launcher = new Launcher(hardwareMap);
@@ -364,6 +365,7 @@ public abstract class BiobuzzAuto extends OpMode {
     @Override
     public void stop() {
         aligner.stop();
+        RobotUtil.lastAutoPose = follower.pose();  // hand off to TeleOp
     }
 
     // ---------------------------------------------------------------- HELPERS
@@ -409,10 +411,13 @@ public abstract class BiobuzzAuto extends OpMode {
         if (!aligner.available()) return true;               // no camera: shoot at the planned pose
         if (stepTimer.seconds() > ALIGN_TIMEOUT) return true; // never let vision cost us the shot
 
-        double tx = aligner.txTo(cell[0], cell[1]);
-        if (Double.isNaN(tx)) return false;  // tag not seen yet: keep holding, wait (until timeout)
+        double[] t = aligner.target(cell[0], cell[1]);
+        if (t == null) return false;  // tag not seen yet: keep holding, wait (until timeout)
 
-        double error = tx - CAMERA_TX_OFFSET_DEG;
+        // Set the flywheel speed for how far away the CELL really is (it spins up while we turn).
+        launcher.setTargetRpm(ShotTable.rpmFor(t[1]));
+
+        double error = t[0] - CAMERA_TX_OFFSET_DEG;
         if (Math.abs(error) < ALIGN_TOLERANCE_DEG) {
             return ++stableLoops >= ALIGN_STABLE_LOOPS;  // must stay on target a few loops
         }

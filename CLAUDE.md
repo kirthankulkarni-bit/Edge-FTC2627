@@ -24,6 +24,27 @@ This file gives Claude Code the context for our FTC (FIRST Tech Challenge) robot
 - GitHub (private): https://github.com/kirthankulkarni-bit/Edge-FTC2627 (`origin`)
 - Pedro Quickstart: `upstream`, for pulling Pedro updates.
 
+## Software map (TeamCode/src/main/java/org/firstinspires/ftc/teamcode)
+
+Season: BIOBUZZ (2026-27). Mechanism classes fall back to SIMULATION when their device is
+missing from the robot configuration, so everything runs before the robot is built.
+
+| File | What it is |
+|------|------------|
+| `BiobuzzAuto` (+ `BiobuzzAutoRed` / `BiobuzzAutoBlue`) | Main auto. Routes FULL / THREE_TIPS / NEAR_TWICE / PRELOAD_PARK / PARK_ONLY and a start delay, picked with the dpad in INIT. Path drawn in `paths/biobuzz-red-auto.pp` |
+| `BiobuzzTeleOp` | Main TeleOp: drive, field-centric toggle, intake, launcher, Limelight auto-aim, rumble alerts |
+| `Intake` | Counts POLLEN (beam-break `intakeBeam`), never holds more than 4 (G407) |
+| `Launcher` | Flywheel (`launcher`) + feeder (`feeder`), velocity PIDF |
+| `TagAligner` | Limelight (`limelight`) AprilTag tx/ty for our CELLs |
+| `ShotTable` | Flywheel RPM from Limelight ty (distance). Placeholder rows |
+| `RobotUtil` | Bulk reads, battery voltage, auto-to-TeleOp pose handoff |
+| `HardwareCheck` | Pit test: lists missing devices, spins motors one at a time, shows sensors |
+| `LauncherTuner` | Tunes flywheel PIDF and measures shot recovery |
+| `LimelightTest` | Shows what the Limelight sees |
+| `pedro/Constants`, `pedro/Tuning` | Pedro config (TODOs) and tuner registration (web page http://192.168.43.1:10158) |
+| `PIDF`, `Lift` | Generic PIDF controller + lift template (not used by BIOBUZZ yet) |
+| `BasicAuto`, `PedroAuto`, `SampleScoringAuto`, `StraferTeleOp` | Earlier practice OpModes |
+
 ## Hardware
 
 - **Controller:** REV Control Hub

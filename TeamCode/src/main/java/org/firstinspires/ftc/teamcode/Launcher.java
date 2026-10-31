@@ -46,6 +46,7 @@ public class Launcher {
     private final DcMotorEx flywheel;  // null when simulated
     private final DcMotor feeder;      // null if not configured
     private boolean spinning = false;
+    private double targetRpm = TARGET_RPM;  // can change per shot (see ShotTable)
     private int shotsLeft = 0;
     private final ElapsedTime spinTimer = new ElapsedTime();
     private final ElapsedTime shotTimer = new ElapsedTime();
@@ -69,6 +70,11 @@ public class Launcher {
                 new PIDFCoefficients(FLY_P, FLY_I, FLY_D, FLY_F));
     }
 
+    /** Change the speed for the next shots, e.g. from ShotTable. TARGET_RPM is the default. */
+    public void setTargetRpm(double rpm) { targetRpm = rpm; }
+
+    public double targetRpm() { return targetRpm; }
+
     public void spinUp() {
         if (!spinning) spinTimer.reset();
         spinning = true;
@@ -90,7 +96,7 @@ public class Launcher {
     /** Call every loop. */
     public void update() {
         if (flywheel != null) {
-            flywheel.setVelocity(spinning ? TARGET_RPM / 60.0 * TICKS_PER_REV : 0);
+            flywheel.setVelocity(spinning ? targetRpm / 60.0 * TICKS_PER_REV : 0);
         }
         boolean feeding = shotsLeft > 0 && isReady();
         if (feeder != null) feeder.setPower(feeding ? FEED_POWER : 0);
@@ -107,7 +113,7 @@ public class Launcher {
     public boolean isReady() {
         if (!spinning) return false;
         if (flywheel == null) return spinTimer.seconds() > SIM_SPINUP_SECONDS;
-        return Math.abs(rpm() - TARGET_RPM) < READY_TOLERANCE_RPM;
+        return Math.abs(rpm() - targetRpm) < READY_TOLERANCE_RPM;
     }
 
     /** True when every requested piece has been launched. */
@@ -116,7 +122,7 @@ public class Launcher {
     public int shotsLeft() { return shotsLeft; }
 
     public double rpm() {
-        return flywheel == null ? (isReady() ? TARGET_RPM : 0) : flywheel.getVelocity() / TICKS_PER_REV * 60.0;
+        return flywheel == null ? (isReady() ? targetRpm : 0) : flywheel.getVelocity() / TICKS_PER_REV * 60.0;
     }
 
     public boolean isSimulated() { return flywheel == null; }

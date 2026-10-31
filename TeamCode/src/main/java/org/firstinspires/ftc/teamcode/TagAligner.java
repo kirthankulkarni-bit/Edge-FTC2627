@@ -40,16 +40,27 @@ public class TagAligner {
      * Positive = the tag is to the RIGHT of the crosshair. Returns NaN if none is visible.
      */
     public double txTo(int minId, int maxId) {
-        if (limelight == null) return Double.NaN;
-        LLResult r = limelight.getLatestResult();
-        if (r == null || !r.isValid() || r.getStaleness() > MAX_AGE_MS) return Double.NaN;
+        double[] t = target(minId, maxId);
+        return t == null ? Double.NaN : t[0];
+    }
 
-        double best = Double.NaN;
+    /**
+     * {tx, ty} in degrees for the most centered tag with an ID in [minId, maxId], or null.
+     * ty (up/down angle) tells distance - see ShotTable.
+     */
+    public double[] target(int minId, int maxId) {
+        if (limelight == null) return null;
+        LLResult r = limelight.getLatestResult();
+        if (r == null || !r.isValid() || r.getStaleness() > MAX_AGE_MS) return null;
+
+        double[] best = null;
         for (LLResultTypes.FiducialResult tag : r.getFiducialResults()) {
             int id = tag.getFiducialId();
             if (id < minId || id > maxId) continue;  // only our own CELL's tags
             double tx = tag.getTargetXDegrees();
-            if (Double.isNaN(best) || Math.abs(tx) < Math.abs(best)) best = tx;
+            if (best == null || Math.abs(tx) < Math.abs(best[0])) {
+                best = new double[]{tx, tag.getTargetYDegrees()};
+            }
         }
         return best;
     }

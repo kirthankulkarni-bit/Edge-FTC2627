@@ -152,7 +152,10 @@ public class LauncherTuner extends LinearOpMode {
             case 1: Launcher.FLY_I = bump(Launcher.FLY_I, factor, dir, 0.01); break;
             case 2: Launcher.FLY_D = bump(Launcher.FLY_D, factor, dir, 0.01); break;
             case 3: Launcher.FLY_F = bump(Launcher.FLY_F, factor, dir, 0.5); break;
-            default: Launcher.TARGET_RPM = Math.max(0, Launcher.TARGET_RPM + 100 * dir); break;
+            default:
+                Launcher.TARGET_RPM = Math.max(0, Launcher.TARGET_RPM + 100 * dir);
+                launcher.setTargetRpm(Launcher.TARGET_RPM);
+                break;
         }
         launcher.applyPIDF();
     }
